@@ -68,6 +68,35 @@ class HGhubPlugin : Plugin() {
         )
         registerMainAPI(
             CmsProvider(
+                name = "老色X资源",
+                mainUrl = "https://apilsbzy1.com",
+                apiBase = "https://apilsbzy1.com/api.php/provide/vod/",
+                referer = "https://apilsbzy1.com/",
+                cats = listOf(
+                    "20" to "精品推荐",
+                    "21" to "国产精品",
+                    "22" to "主播秀色",
+                    "24" to "日本无码",
+                    "25" to "中文字幕",
+                ),
+            )
+        )
+        registerMainAPI(
+            CmsProvider(
+                name = "搜av资源",
+                mainUrl = "https://api.souavzyw.net",
+                apiBase = "https://api.souavzyw.net/api.php/provide/vod",
+                referer = "https://api.souavzyw.net/",
+                cats = listOf(
+                    "1" to "中文传媒",
+                    "2" to "国产",
+                    "3" to "欧美AV",
+                    "4" to "日本AV",
+                ),
+            )
+        )
+        registerMainAPI(
+            CmsProvider(
                 name = "大X子资源",
                 mainUrl = "https://apidanaizi.com",
                 apiBase = "https://apidanaizi.com/api.php/provide/vod/",
@@ -80,19 +109,6 @@ class HGhubPlugin : Plugin() {
                 ),
             )
         )
-        registerMainAPI(
-            CmsProvider(
-                name = "黄色仓库",
-                mainUrl = "https://hsckzy888.com",
-                apiBase = "https://hsckzy888.com/api.php/provide/vod",
-                referer = "https://hsckzy888.com/",
-                cats = listOf(
-                    "1" to "国产区",
-                    "2" to "AV区",
-                    "3" to "欧美区",
-                    "4" to "动漫区",
-                ),
-            )
         )
     }
 }
