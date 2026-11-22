@@ -31,7 +31,68 @@ object HGhubCtx {
 class HGhubPlugin : Plugin() {
     override fun load(context: Context) {
         HGhubCtx.init(context)
+
+        // 黄果短剧（自有 API + 封面解密）
         registerMainAPI(HGhubProvider())
-        registerMainAPI(SenlinProvider())
+
+        // 苹果CMS 资源站（成人向，实测均可用）
+        registerMainAPI(
+            CmsProvider(
+                name = "森林资源",
+                mainUrl = "https://beiyong.slapibf.com",
+                apiBase = "https://beiyong.slapibf.com/api.php/provide/vod/",
+                referer = "https://senlinzy1.com/",
+                cats = listOf(
+                    "20" to "精品推荐",
+                    "22" to "国产色情",
+                    "23" to "主播直播",
+                    "24" to "中文字幕",
+                    "30" to "欧美精品",
+                ),
+            )
+        )
+        registerMainAPI(
+            CmsProvider(
+                name = "155资源",
+                mainUrl = "https://155api.com",
+                apiBase = "https://155api.com/api.php/provide/vod",
+                referer = "https://155api.com/",
+                cats = listOf(
+                    "1" to "无码专区",
+                    "2" to "麻豆传媒",
+                    "3" to "制服诱惑",
+                    "4" to "中文字幕",
+                    "5" to "国产自拍",
+                ),
+            )
+        )
+        registerMainAPI(
+            CmsProvider(
+                name = "大X子资源",
+                mainUrl = "https://apidanaizi.com",
+                apiBase = "https://apidanaizi.com/api.php/provide/vod/",
+                referer = "https://apidanaizi.com/",
+                cats = listOf(
+                    "1" to "视频一区",
+                    "2" to "视频二区",
+                    "3" to "视频三区",
+                    "4" to "视频四区",
+                ),
+            )
+        )
+        registerMainAPI(
+            CmsProvider(
+                name = "黄色仓库",
+                mainUrl = "https://hsckzy888.com",
+                apiBase = "https://hsckzy888.com/api.php/provide/vod",
+                referer = "https://hsckzy888.com/",
+                cats = listOf(
+                    "1" to "国产区",
+                    "2" to "AV区",
+                    "3" to "欧美区",
+                    "4" to "动漫区",
+                ),
+            )
+        )
     }
 }
