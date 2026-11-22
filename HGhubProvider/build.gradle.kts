@@ -1,7 +1,7 @@
-version = 4
+version = 5
 
 cloudstream {
-    description = "黄果短剧 · 列表 / 搜索 / 整季播放"
+    description = "黄果短剧 + 森林资源 · 列表/搜索/播放/封面解密"
     authors = listOf("hghub")
     status = 1
     tvTypes = listOf("TvSeries", "Movie")
