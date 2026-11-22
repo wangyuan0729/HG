@@ -203,7 +203,7 @@ class HGhubProvider : MainAPI() {
             callback.invoke(
                 newExtractorLink(
                     source = this.name,
-                    name = "${this.name} 第$ep集",
+                    name = "${this.name} 第${ep}集",
                     url = link,
                     type = ExtractorLinkType.M3U8,
                 ) {
