@@ -40,7 +40,7 @@ import java.net.URLEncoder
 class SenlinProvider : MainAPI() {
     override var mainUrl = "https://beiyong.slapibf.com"
     override var name = "森林资源"
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.AsianPorn)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.NSFW)
     override var lang = "zh"
 
     override val hasMainPage = true
