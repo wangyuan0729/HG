@@ -5,6 +5,7 @@ import com.google.gson.JsonParser
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.MainPageData
 import com.lagradost.cloudstream3.MainPageRequest
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.SubtitleFile
@@ -26,27 +27,31 @@ import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 
 /**
- * 通用苹果CMS（MacCMS V10）资源站源。
+ * 苹果CMS（MacCMS V10）资源站基类。
  *
- *   GET {api}?ac=list                        分类
- *   GET {api}?ac=videolist&pg=N[&t=分类id]   列表
- *   GET {api}?ac=videolist&wd=关键词          搜索
- *   GET {api}?ac=detail&ids=ID               详情（vod_play_url 里是 m3u8 或 /play/xxx）
- *
- * 加新站只需在 HGhubPlugin 里多注册一个实例。
+ * 子类只需在 init 里赋值 name / mainUrl，并 override apiBase / referer / cats。
+ * 全部无参构造 —— CloudStream 反射实例化插件时更稳。
  */
-open class CmsProvider(
-    override var name: String,
-    override var mainUrl: String,
-    private val apiBase: String,
-    private val referer: String,
-    private val cats: List<Pair<String, String>> = emptyList(),
-) : MainAPI() {
+open class CmsBaseProvider : MainAPI() {
+
+    override var name: String = "CMS"
+    override var mainUrl: String = ""
 
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.NSFW)
     override var lang = "zh"
     override val hasMainPage = true
     override val hasQuickSearch = true
+
+    /** 采集接口根地址，如 https://host/api.php/provide/vod/ */
+    protected open val apiBase: String
+        get() = "$mainUrl/api.php/provide/vod/"
+
+    protected open val referer: String
+        get() = "$mainUrl/"
+
+    /** 主页分类：(type_id, 名称)，留空则只有「最新」 */
+    protected open val cats: List<Pair<String, String>>
+        get() = emptyList()
 
     private val ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
@@ -87,12 +92,13 @@ open class CmsProvider(
     }
 
     // ------------------------------------------------------------ 主页
-    override val mainPage = mainPageOf(
-        *buildList {
-            add("" to "最新")
-            cats.forEach { add(it.first to it.second) }
-        }.toTypedArray()
-    )
+    override val mainPage: List<MainPageData>
+        get() = mainPageOf(
+            *buildList {
+                add("" to "最新")
+                addAll(cats)
+            }.toTypedArray()
+        )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val t = request.data
@@ -118,7 +124,6 @@ open class CmsProvider(
         val title = o.str("vod_name") ?: "视频 $id"
         val plot = o.str("vod_content")?.replace(Regex("<[^>]+>"), "")?.trim()
 
-        // 多线路用 $$$ 分隔，剧集用 # 分隔，名称与地址用 $ 分隔
         val groups = (o.str("vod_play_url") ?: "").split("$$$")
         val group = groups.firstOrNull { it.contains(".m3u8") } ?: groups.firstOrNull().orEmpty()
         val eps = group.split("#").filter { it.isNotBlank() }.mapIndexedNotNull { idx, seg ->
@@ -175,13 +180,12 @@ open class CmsProvider(
             return false
         }
 
-        // 有些站给的是网页播放器 /play/xxx，页面里通常就写着 m3u8
+        // 有些站给的是网页播放器 /play/xxx，页面里通常写着 m3u8
         if (!playUrl.contains(".m3u8") && !playUrl.contains(".mp4")) {
             val resolved = withContext(Dispatchers.IO) {
                 runCatching {
                     val html = app.get(playUrl, headers = headers()).text
-                    Regex("https?://[^'\"\\s]+\\.m3u8[^'\"\\s]*")
-                        .find(html)?.value
+                    Regex("https?://[^'\"\\s]+\\.m3u8[^'\"\\s]*").find(html)?.value
                 }.getOrNull()
             }
             if (resolved != null) playUrl = resolved
@@ -200,4 +204,52 @@ open class CmsProvider(
         )
         return true
     }
+}
+
+// ---------------------------------------------------------------- 各站
+class SenlinProviderImpl : CmsBaseProvider() {
+    init { name = "森林资源"; mainUrl = "https://beiyong.slapibf.com" }
+    override val apiBase get() = "https://beiyong.slapibf.com/api.php/provide/vod/"
+    override val referer get() = "https://senlinzy1.com/"
+    override val cats get() = listOf(
+        "20" to "精品推荐", "22" to "国产色情", "23" to "主播直播",
+        "24" to "中文字幕", "30" to "欧美精品",
+    )
+}
+
+class LaoseProvider : CmsBaseProvider() {
+    init { name = "老色X资源"; mainUrl = "https://apilsbzy1.com" }
+    override val apiBase get() = "https://apilsbzy1.com/api.php/provide/vod/"
+    override val referer get() = "https://apilsbzy1.com/"
+    override val cats get() = listOf(
+        "20" to "精品推荐", "21" to "国产精品", "22" to "主播秀色",
+        "24" to "日本无码", "25" to "中文字幕",
+    )
+}
+
+class Api155Provider : CmsBaseProvider() {
+    init { name = "155资源"; mainUrl = "https://155api.com" }
+    override val apiBase get() = "https://155api.com/api.php/provide/vod"
+    override val referer get() = "https://155api.com/"
+    override val cats get() = listOf(
+        "1" to "无码专区", "2" to "麻豆传媒", "4" to "中文字幕", "5" to "国产自拍",
+    )
+}
+
+class SouavProvider : CmsBaseProvider() {
+    init { name = "搜av资源"; mainUrl = "https://api.souavzyw.net" }
+    override val apiBase get() = "https://api.souavzyw.net/api.php/provide/vod"
+    override val referer get() = "https://api.souavzyw.net/"
+    override val cats get() = listOf(
+        "1" to "中文传媒", "2" to "国产", "3" to "欧美AV", "4" to "日本AV",
+    )
+}
+
+class DaxziProvider : CmsBaseProvider() {
+    init { name = "大X子资源"; mainUrl = "https://apidanaizi.com" }
+    override val apiBase get() = "https://apidanaizi.com/api.php/provide/vod/"
+    override val referer get() = "https://apidanaizi.com/"
+    override val cats get() = listOf(
+        "1" to "视频一区", "2" to "视频二区", "3" to "视频三区", "4" to "视频四区",
+    )
 }
