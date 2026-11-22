@@ -7,17 +7,20 @@ import android.widget.Toast
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
 
-/** 持有宿主 Context，用于把错误显示在屏幕上（否则只能翻 logcat）。 */
+/** 持有宿主 Context：用于弹诊断信息，以及写封面缓存目录。 */
 object HGhubCtx {
     @Volatile
-    private var ctx: Context? = null
+    private var appCtx: Context? = null
+
+    val context: Context?
+        get() = appCtx
 
     fun init(c: Context) {
-        ctx = c.applicationContext ?: c
+        appCtx = c.applicationContext ?: c
     }
 
     fun toast(msg: String) {
-        val c = ctx ?: return
+        val c = appCtx ?: return
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(c, msg, Toast.LENGTH_LONG).show()
         }
