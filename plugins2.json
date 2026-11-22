@@ -1,0 +1,15 @@
+[
+  {
+    "internalName": "HGhubProvider",
+    "name": "HGhub 多源",
+    "version": 8,
+    "url": "https://wangyuan0729.github.io/HG/HGhubProvider.cs3",
+    "description": "黄果 + 森林/老色X/155/搜av/大X子",
+    "authors": ["hghub"],
+    "tvTypes": ["TvSeries", "Movie", "NSFW"],
+    "language": "zh",
+    "iconUrl": "",
+    "apiVersion": 1,
+    "status": 1
+  }
+]
