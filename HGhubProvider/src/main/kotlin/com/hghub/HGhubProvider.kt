@@ -1,26 +1,26 @@
 package com.hghub
 
-import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.MainPageRequest
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.MainPageRequest
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.mainPageOf
 import com.lagradost.cloudstream3.newEpisode
 import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.newMovieSearchResponse
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.cloudstream3.newTvSeriesSearchResponse
-import com.lagradost.cloudstream3.mainPageOf
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -32,10 +32,9 @@ import java.util.concurrent.TimeUnit
 /**
  * HGHub —— 黄果短剧
  *
- * 站点 API（匿名即可，无需登录）：
  *   GET  /api/videos?page=&size=            列表
  *   GET  /api/videos/{id}                   详情（含 episodes）
- *   GET  /api/search?q=                     搜索（向量检索，参数名是 q）
+ *   GET  /api/search?q=                     搜索（参数名是 q）
  *   POST /api/videos/{id}/episodes/{ep}/playback   播放地址 → data.streams.main
  */
 class HGhubProvider : MainAPI() {
@@ -46,7 +45,6 @@ class HGhubProvider : MainAPI() {
 
     override val hasMainPage = true
     override val hasQuickSearch = true
-    override val hasDownloadSupport = true
 
     private val ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
@@ -54,6 +52,7 @@ class HGhubProvider : MainAPI() {
     private val client = OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .followRedirects(true)
         .build()
 
     private fun headers(): Map<String, String> = mapOf(
@@ -69,16 +68,18 @@ class HGhubProvider : MainAPI() {
         JsonParser.parseString(text).asJsonObject
     }
 
-    /** 播放接口必须 POST + application/json，CloudStream 的 app.post 只能发表单，所以直连 okhttp。 */
-    private suspend fun postJson(path: String, body: String = "{}"): JsonObject = withContext(Dispatchers.IO) {
+    /** 播放接口必须 POST + application/json；CloudStream 的 app.post 只能发表单，所以用 okhttp 直连。 */
+    private suspend fun postJson(path: String): JsonObject = withContext(Dispatchers.IO) {
         val req = Request.Builder()
             .url("$mainUrl$path")
-            .post(body.toRequestBody("application/json".toMediaType()))
+            .post("{}".toRequestBody("application/json".toMediaType()))
             .apply { headers().forEach { (k, v) -> header(k, v) } }
             .build()
         client.newCall(req).execute().use { resp ->
             val txt = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw RuntimeException("HTTP ${resp.code}: ${txt.take(160)}")
+            if (!resp.isSuccessful) {
+                throw RuntimeException("HTTP ${resp.code}: ${txt.take(120)}")
+            }
             JsonParser.parseString(txt).asJsonObject
         }
     }
@@ -100,20 +101,15 @@ class HGhubProvider : MainAPI() {
             runCatching { it.asInt }.getOrNull()
         }
 
-    /** 数据行 → 卡片 */
     private fun toSearchResult(o: JsonObject): SearchResponse? {
         val id = o.intOf("id") ?: return null
         val title = o.str("title") ?: return null
         val count = o.intOf("episode_count") ?: 0
         val url = "$mainUrl/video/$id"
         return if (count > 1) {
-            newTvSeriesSearchResponse(title, url, TvType.TvSeries) {
-                posterUrl = o.str("cover")
-            }
+            newTvSeriesSearchResponse(title, url, TvType.TvSeries) { posterUrl = o.str("cover") }
         } else {
-            newMovieSearchResponse(title, url, TvType.Movie) {
-                posterUrl = o.str("cover")
-            }
+            newMovieSearchResponse(title, url, TvType.Movie) { posterUrl = o.str("cover") }
         }
     }
 
@@ -146,8 +142,7 @@ class HGhubProvider : MainAPI() {
     // ------------------------------------------------------------ 详情
     override suspend fun load(url: String): LoadResponse {
         val id = url.trimEnd('/').substringAfterLast('/')
-        val d = getJson("/api/videos/$id").obj("data")
-            ?: throw RuntimeException("详情为空")
+        val d = getJson("/api/videos/$id").obj("data") ?: throw RuntimeException("详情为空")
 
         val title = d.str("title") ?: "视频 $id"
         val plot = d.str("description")
@@ -187,23 +182,58 @@ class HGhubProvider : MainAPI() {
     ): Boolean {
         val id = data.substringBefore("|")
         val ep = data.substringAfter("|", "1").ifBlank { "1" }
+        val diag = StringBuilder("id=$id ep=$ep")
 
-        val root = postJson("/api/videos/$id/episodes/$ep/playback")
-        val streams = root.obj("data").obj("streams") ?: return false
+        // 诊断 1：DNS
+        try {
+            val addrs = withContext(Dispatchers.IO) {
+                java.net.InetAddress.getAllByName("hust.zekpkeusp.cc").joinToString(",") { it.hostAddress ?: "?" }
+            }
+            diag.append(" | dns=").append(addrs.take(40))
+        } catch (e: Exception) {
+            diag.append(" | dns失败:").append(e.message?.take(40))
+        }
 
-        var found = false
+        // 诊断 2：能不能 GET（复用宿主网络栈）
+        try {
+            val g = app.get("$mainUrl/api/videos/$id", headers = headers()).text
+            diag.append(" | GET=").append(g.length).append("B")
+        } catch (e: Exception) {
+            diag.append(" | GET失败:").append(e.javaClass.simpleName).append(" ").append(e.message?.take(60))
+        }
+
+        // 请求播放地址
+        val root = try {
+            postJson("/api/videos/$id/episodes/$ep/playback")
+        } catch (e: Exception) {
+            HGhubCtx.toast("请求播放地址失败｜$diag｜POST: ${e.javaClass.simpleName} ${e.message?.take(80)}")
+            return false
+        }
+
+        val streams = root.obj("data").obj("streams")
+        if (streams == null) {
+            HGhubCtx.toast("接口无 streams｜$diag｜返回: ${root.toString().take(120)}")
+            return false
+        }
+
         // 优先 main，其次任何字符串型流
-        val ordered = listOfNotNull(streams.get("main")?.let { "main" to it })
-            .plus(streams.entrySet().filter { it.value.isJsonPrimitive && it.value.asJsonPrimitive.isString }
-                .map { it.key to it.value })
+        val candidates = buildList {
+            streams.get("main")?.takeIf { it.isJsonPrimitive }?.let { add(it.asString) }
+            streams.entrySet().forEach { e ->
+                if (e.value.isJsonPrimitive && e.value.asJsonPrimitive.isString) add(e.value.asString)
+            }
+        }.filter { it.startsWith("http") }.distinct()
 
-        for ((_, value) in ordered) {
-            val link = runCatching { value.asString }.getOrNull() ?: continue
-            if (!link.startsWith("http")) continue
+        if (candidates.isEmpty()) {
+            HGhubCtx.toast("streams 里没有地址｜$diag｜${streams.toString().take(120)}")
+            return false
+        }
+
+        candidates.forEach { link ->
             callback.invoke(
                 newExtractorLink(
-                    source = this.name,
-                    name = "${this.name} 第${ep}集",
+                    source = name,
+                    name = "$name 第${ep}集",
                     url = link,
                     type = ExtractorLinkType.M3U8,
                 ) {
@@ -211,9 +241,7 @@ class HGhubProvider : MainAPI() {
                     this.quality = Qualities.Unknown.value
                 }
             )
-            found = true
-            break
         }
-        return found
+        return true
     }
 }
