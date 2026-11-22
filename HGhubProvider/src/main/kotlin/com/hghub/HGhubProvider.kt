@@ -141,7 +141,9 @@ class HGhubProvider : MainAPI() {
 
     // ------------------------------------------------------------ 详情
     override suspend fun load(url: String): LoadResponse {
-        val id = url.trimEnd('/').substringAfterLast('/')
+        // CloudStream 会把相对路径补全成绝对 URL，所以按「最后一段纯数字」取 id，别用固定分隔符
+        val id = url.trimEnd('/').split("/").lastOrNull { it.isNotEmpty() && it.all(Char::isDigit) }
+            ?: throw RuntimeException("无法从 url 解析 id: $url")
         val d = getJson("/api/videos/$id").obj("data") ?: throw RuntimeException("详情为空")
 
         val title = d.str("title") ?: "视频 $id"
@@ -151,7 +153,8 @@ class HGhubProvider : MainAPI() {
             val e = runCatching { el.asJsonObject }.getOrNull() ?: return@mapNotNull null
             val num = e.intOf("ep_num") ?: return@mapNotNull null
             val dur = e.intOf("duration") ?: 0
-            newEpisode("$id|$num") {
+            // 用相对路径形式，避免 CloudStream 把 "id|ep" 当成相对地址补全
+            newEpisode("/ep/$id/$num") {
                 this.name = "第 $num 集"
                 this.episode = num
                 if (dur > 0) this.runTime = dur / 60
@@ -165,7 +168,7 @@ class HGhubProvider : MainAPI() {
                 this.posterUrl = d.str("cover")
             }
         } else {
-            newMovieLoadResponse(title, url, TvType.Movie, "$id|1") {
+            newMovieLoadResponse(title, url, TvType.Movie, "/ep/$id/1") {
                 this.plot = plot
                 this.tags = tags
                 this.posterUrl = d.str("cover")
@@ -180,8 +183,14 @@ class HGhubProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ): Boolean {
-        val id = data.substringBefore("|")
-        val ep = data.substringAfter("|", "1").ifBlank { "1" }
+        // data 已被 CloudStream 补全成 https://host/ep/<id>/<ep>，取末尾两段数字
+        val segs = data.trimEnd('/').split("/").filter { it.isNotEmpty() }
+        val ep = segs.lastOrNull()?.takeIf { it.all(Char::isDigit) } ?: "1"
+        val id = segs.dropLast(1).lastOrNull { it.all(Char::isDigit) }
+            ?: run {
+                HGhubCtx.toast("无法解析 episode data: " + data.take(120))
+                return false
+            }
         val diag = StringBuilder("id=$id ep=$ep")
 
         // 诊断 1：DNS
