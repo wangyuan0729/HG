@@ -1,4 +1,4 @@
-version = 3
+version = 4
 
 cloudstream {
     description = "黄果短剧 · 列表 / 搜索 / 整季播放"
