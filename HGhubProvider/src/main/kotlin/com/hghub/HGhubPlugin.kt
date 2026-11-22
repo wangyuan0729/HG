@@ -32,5 +32,6 @@ class HGhubPlugin : Plugin() {
     override fun load(context: Context) {
         HGhubCtx.init(context)
         registerMainAPI(HGhubProvider())
+        registerMainAPI(SenlinProvider())
     }
 }
