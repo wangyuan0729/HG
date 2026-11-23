@@ -43,7 +43,7 @@ class DaxziProvider : MainAPI() {
     override val hasQuickSearch = true
     private val apiBase = "https://apidanaizi.com/api.php/provide/vod/"
     private val referer = "https://apidanaizi.com/"
-    private val cats: List<Pair<String, String>> = listOf("1" to "视频一区", "2" to "视频二区", "3" to "视频三区")
+    private val cats: List<Pair<String, String>> = listOf("20" to "精品推荐", "21" to "国产主播", "22" to "国产乱伦", "23" to "自拍偷拍", "24" to "制服丝袜")
 
     private val ua = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
