@@ -1,7 +1,7 @@
-version = 12
+version = 13
 
 cloudstream {
-    description = "黄果 + 森林/155/老色X/搜av/大X子"
+    description = "黄果 + 森林/老色X/155/豆豆/大X子"
     authors = listOf("hghub")
     status = 1
     tvTypes = listOf("TvSeries", "Movie")
