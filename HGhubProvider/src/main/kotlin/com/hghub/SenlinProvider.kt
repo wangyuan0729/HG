@@ -37,7 +37,7 @@ class SenlinProvider : MainAPI() {
     override var name = "森林资源"
     override var mainUrl = "https://beiyong.slapibf.com"
 
-    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.NSFW)
+    override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries)
     override var lang = "zh"
     override val hasMainPage = true
     override val hasQuickSearch = true
