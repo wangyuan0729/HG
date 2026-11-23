@@ -1,0 +1,8 @@
+{
+  "name": "HGhub",
+  "description": "黄果短剧 + 4 个成人资源站",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://cdn.jsdelivr.net/gh/wangyuan0729/HG@gh-pages/plugins2.json"
+  ]
+}
