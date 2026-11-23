@@ -4,10 +4,15 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.plugins.CloudstreamPlugin
 import com.lagradost.cloudstream3.plugins.Plugin
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-/** 持有宿主 Context：用于弹诊断信息，以及写封面缓存目录。 */
+/** 持有宿主 Context：用于弹诊断信息、写封面缓存、写注册诊断日志。 */
 object HGhubCtx {
     @Volatile
     private var appCtx: Context? = null
@@ -25,19 +30,45 @@ object HGhubCtx {
             Toast.makeText(c, msg, Toast.LENGTH_LONG).show()
         }
     }
+
+    /** 把注册过程写到外部文件，release 版拿不到 logcat 时靠它排查。 */
+    fun log(line: String) {
+        val c = appCtx ?: return
+        try {
+            val dir = c.getExternalFilesDir(null) ?: c.filesDir
+            val ts = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+            File(dir, "hghub_register.log").appendText("[$ts] $line\n")
+        } catch (_: Throwable) {
+        }
+    }
+
+    fun resetLog() {
+        val c = appCtx ?: return
+        try {
+            val dir = c.getExternalFilesDir(null) ?: c.filesDir
+            File(dir, "hghub_register.log").writeText("")
+        } catch (_: Throwable) {
+        }
+    }
 }
 
 @CloudstreamPlugin
 class HGhubPlugin : Plugin() {
     override fun load(context: Context) {
         HGhubCtx.init(context)
+        HGhubCtx.resetLog()
+        HGhubCtx.log("=== plugin load start ===")
 
-        // 每个源单独 try，一个站出问题不影响其它源注册
-        fun register(tag: String, p: () -> com.lagradost.cloudstream3.MainAPI) {
+        fun register(tag: String, factory: () -> MainAPI) {
             try {
-                registerMainAPI(p())
+                val api = factory()
+                HGhubCtx.log("created $tag: name=${api.name} mainUrl=${api.mainUrl}")
+                registerMainAPI(api)
+                HGhubCtx.log("registered OK: $tag")
             } catch (e: Throwable) {
-                HGhubCtx.toast("源「$tag」注册失败：${e.javaClass.simpleName} ${e.message?.take(40)}")
+                HGhubCtx.log("FAILED $tag: ${e.javaClass.name}: ${e.message}")
+                HGhubCtx.log(e.stackTraceToString().take(1200))
+                HGhubCtx.toast("源「$tag」注册失败：${e.javaClass.simpleName}")
             }
         }
 
@@ -47,5 +78,7 @@ class HGhubPlugin : Plugin() {
         register("155资源") { Api155Provider() }
         register("搜av资源") { SouavProvider() }
         register("大X子资源") { DaxziProvider() }
+
+        HGhubCtx.log("=== plugin load end ===")
     }
 }
