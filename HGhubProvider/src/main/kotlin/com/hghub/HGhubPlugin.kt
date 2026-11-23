@@ -73,11 +73,6 @@ class HGhubPlugin : Plugin() {
         }
 
         register("HGHub") { HGhubProvider() }
-        register("森林资源") { SenlinProvider() }
-        register("老色X资源") { LaoseProvider() }
-        register("155资源") { Api155Provider() }
-        register("搜av资源") { SouavProvider() }
-        register("大X子资源") { DaxziProvider() }
 
         HGhubCtx.log("=== plugin load end ===")
     }
